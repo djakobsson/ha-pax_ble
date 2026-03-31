@@ -184,7 +184,7 @@ class PaxCalimaNumberEntity(PaxCalimaEntity, NumberEntity):
         """Return number value."""
         try:
             return int(self.coordinator.get_data(self._key))
-        except:
+        except (TypeError, ValueError):
             return None
 
     async def async_set_native_value(self, value):

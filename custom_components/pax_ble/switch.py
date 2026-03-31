@@ -111,7 +111,7 @@ class PaxCalimaSwitchEntity(PaxCalimaEntity, SwitchEntity):
             attrs.update(super().extra_state_attributes)
             return attrs
         else:
-            return None
+            return {}
 
     async def async_turn_on(self, **kwargs):
         _LOGGER.debug("Enabling %s", self._attr_name)

@@ -97,13 +97,11 @@ async def service_request_update(hass, call: ServiceCall):
         return
 
     """Find the coordinator corresponding to the given device ID."""
-    coordinators = hass.data[DOMAIN].get(CONF_DEVICES, {})
-
-    # Iterate through all coordinators and check their device_id property
-    for coordinator in coordinators.values():
-        if getattr(coordinator, "device_id", None) == device_id:
-            await coordinator._async_update_data()
-            return
+    for entry_data in hass.data.get(DOMAIN, {}).values():
+        for coordinator in entry_data.get(CONF_DEVICES, {}).values():
+            if getattr(coordinator, "device_id", None) == device_id:
+                await coordinator._async_update_data()
+                return
 
     _LOGGER.warning("No coordinator found for device ID %s", device_id)
 
@@ -159,16 +157,21 @@ async def async_remove_config_entry_device(
     dev_reg.async_remove_device(device_id)
 
     """Remove from config_entry"""
-    devices = []
-    for dev_id, dev_config in config_entry.data[CONF_DEVICES].items():
-        if dev_config[CONF_NAME] == device_entry.name:
-            devices.append(dev_config[CONF_MAC])
+    remove_macs = {
+        dev_config[CONF_MAC]
+        for dev_id, dev_config in config_entry.data[CONF_DEVICES].items()
+        if dev_config[CONF_MAC] in {
+            identifier for _, identifier in device_entry.identifiers
+            if _ == DOMAIN
+        }
+    }
 
-    new_data = config_entry.data.copy()
-    for dev in devices:
-        # Remove device from config entry
-        new_data[CONF_DEVICES].pop(dev)
+    new_devices = {
+        dev_id: dev_config
+        for dev_id, dev_config in config_entry.data[CONF_DEVICES].items()
+        if dev_config[CONF_MAC] not in remove_macs
+    }
+    new_data = {**config_entry.data, CONF_DEVICES: new_devices}
     hass.config_entries.async_update_entry(config_entry, data=new_data)
-    hass.config_entries._async_schedule_save()
 
     return True

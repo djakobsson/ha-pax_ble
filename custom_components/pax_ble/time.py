@@ -71,7 +71,7 @@ class PaxCalimaTimeEntity(PaxCalimaEntity, TimeEntity):
         """Return time value."""
         try:
             return self.coordinator.get_data(self._key)
-        except:
+        except (TypeError, ValueError):
             return None
 
     async def async_set_value(self, value: time) -> None:

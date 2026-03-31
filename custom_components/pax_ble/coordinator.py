@@ -6,7 +6,7 @@ import logging
 from abc import ABC, abstractmethod
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceEntry
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from typing import Optional
 
 from .devices.base_device import BaseDevice
@@ -222,11 +222,11 @@ class BaseCoordinator(DataUpdateCoordinator, ABC):
                 self._connection_failures += 1
 
         """ Fetch config data if we have no/old values """
-        if dt.datetime.now().date() != self._last_config_timestamp:
+        if self._last_config_timestamp is None or (dt.datetime.now() - self._last_config_timestamp) >= dt.timedelta(hours=24):
             try:
                 async with async_timeout.timeout(45):
                     if await self.read_configdata(disconnect=False):
-                        self._last_config_timestamp = dt.datetime.now().date()
+                        self._last_config_timestamp = dt.datetime.now()
             except asyncio.CancelledError:
                 _LOGGER.debug("Config data loading was cancelled")
                 raise  # Re-raise cancellation to handle it properly
@@ -252,6 +252,11 @@ class BaseCoordinator(DataUpdateCoordinator, ABC):
         except Exception as err:
             _LOGGER.debug("Failed when fetching sensordata: %s", str(err))
             self._connection_failures += 1
+
+        # Mark entities unavailable after 2+ consecutive failures so HA reflects device state.
+        # One transient failure is tolerated silently (common with BLE).
+        if self._connection_failures >= 2:
+            raise UpdateFailed(f"Unable to connect to {self.devicename}")
 
     async def _async_update_device_info(self) -> None:
         device_registry = dr.async_get(self.hass)

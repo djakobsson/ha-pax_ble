@@ -52,18 +52,20 @@ class BaseDevice:
             CHARACTERISTIC_STATUS: "25a824ad-3021-4de9-9f2f-60cf8d17bded",
         }
 
+    @property
+    def mac(self) -> str:
+        return self._mac
+
     def set_disconnect_callback(self, callback):
         """Set callback to be called when device disconnects unexpectedly."""
         self._disconnect_callback = callback
 
     def _handle_disconnect(self, _client):
-        """Handle unexpected disconnection.
-
-        Only logs the disconnection for debugging purposes.
-        Reconnection is handled lazily on the next poll cycle.
-        """
+        """Handle unexpected disconnection."""
         _LOGGER.debug("Device %s disconnected, will reconnect on next poll", self._mac)
         self._client = None
+        if self._disconnect_callback:
+            self._hass.async_create_task(self._disconnect_callback())
 
     async def authorize(self):
         await self.setAuth(self._pin)

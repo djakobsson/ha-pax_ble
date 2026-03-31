@@ -25,10 +25,10 @@ class PaxCalimaEntity(CoordinatorEntity):
         self._attr_name = "{} {}".format(
             self.coordinator.devicename, paxentity.entityName
         )
-        self._attr_unique_id = "{}-{}".format(self.coordinator.device_id, self.name)
+        self._attr_unique_id = "{}-{}".format(self.coordinator.device_id, paxentity.key)
         self._attr_device_info = DeviceInfo(
             identifiers=self.coordinator.identifiers,
-            connections={(dr.CONNECTION_BLUETOOTH, self.coordinator.fan._mac)},
+            connections={(dr.CONNECTION_BLUETOOTH, self.coordinator.fan.mac)},
         )
         self._extra_state_attributes = {}
 
