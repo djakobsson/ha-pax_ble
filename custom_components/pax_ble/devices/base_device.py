@@ -127,13 +127,12 @@ class BaseDevice:
         return self._client is not None and self._client.is_connected
 
     async def validate_connection(self) -> bool:
-        """Validate that the connection is still working by reading a basic characteristic."""
+        """Validate that the connection is still working by reading sensor data."""
         if not self.isConnected():
             return False
 
         try:
-            # Try to read device name as a connection health check
-            await asyncio.wait_for(self._client.read_gatt_char(self.chars[CHARACTERISTIC_DEVICE_NAME]), timeout=5.0)
+            await asyncio.wait_for(self._client.read_gatt_char(self.chars[CHARACTERISTIC_SENSOR_DATA]), timeout=5.0)
             return True
         except Exception as e:
             _LOGGER.debug("Connection validation failed for %s: %s", self._mac, e)

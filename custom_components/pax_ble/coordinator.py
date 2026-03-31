@@ -131,13 +131,15 @@ class BaseCoordinator(DataUpdateCoordinator, ABC):
 
     async def _background_reconnect(self):
         """Background task to reconnect to device with exponential backoff."""
-        while self._connection_failures > 0 and self._connection_failures < self._max_connection_failures:
+        attempt = 0
+        while True:
+            attempt += 1
             backoff_time = min(
-                self._fast_poll_interval * (self._backoff_multiplier ** (self._connection_failures - 1)),
+                self._fast_poll_interval * (self._backoff_multiplier ** (attempt - 1)),
                 self._max_backoff
             )
             _LOGGER.debug("Attempting reconnection to %s in %d seconds (attempt %d)",
-                         self.devicename, backoff_time, self._connection_failures)
+                         self.devicename, backoff_time, attempt)
 
             await asyncio.sleep(backoff_time)
 
@@ -146,18 +148,10 @@ class BaseCoordinator(DataUpdateCoordinator, ABC):
                     _LOGGER.info("Successfully reconnected to %s", self.devicename)
                     self._connection_failures = 0
                     self.setNormalPollMode()
-                    # Trigger immediate data refresh
                     await self._async_update_data()
                     return
-                else:
-                    self._connection_failures += 1
             except Exception as e:
                 _LOGGER.debug("Reconnection attempt failed: %s", e)
-                self._connection_failures += 1
-
-        if self._connection_failures >= self._max_connection_failures:
-            _LOGGER.error("Failed to reconnect to %s after %d attempts, giving up",
-                         self.devicename, self._max_connection_failures)
 
     async def _safe_connect(self) -> bool:
         """
@@ -200,10 +194,10 @@ class BaseCoordinator(DataUpdateCoordinator, ABC):
         """ Counter for fast polling """
         self._update_poll_counter()
 
-        # Skip updates if we have too many connection failures
+        # Rate-limit updates after too many connection failures, but don't give up permanently
         if self._connection_failures >= self._max_connection_failures:
-            _LOGGER.debug("Skipping update due to too many connection failures")
-            return
+            _LOGGER.debug("Too many connection failures, attempting recovery for %s", self.devicename)
+            self._connection_failures = 0  # Reset to allow a fresh attempt
 
         # Early return on cancellation to avoid blocking HA startup
         try:
