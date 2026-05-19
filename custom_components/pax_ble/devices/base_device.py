@@ -29,6 +29,7 @@ class BaseDevice:
         self._client: BleakClientWithServiceCache | None = None
         self._connect_lock = asyncio.Lock()
         self._disconnect_callback = None
+        self._disconnecting = False
         # Characteristic UUIDs (centralized in characteristics.py ideally)
         self.chars = {
             CHARACTERISTIC_APPEARANCE: "00002a01-0000-1000-8000-00805f9b34fb",  # Not used
@@ -62,8 +63,10 @@ class BaseDevice:
 
     def _handle_disconnect(self, _client):
         """Handle unexpected disconnection."""
-        _LOGGER.debug("Device %s disconnected, will reconnect on next poll", self._mac)
         self._client = None
+        if self._disconnecting:
+            return
+        _LOGGER.debug("Device %s disconnected, will reconnect on next poll", self._mac)
         if self._disconnect_callback:
             self._hass.async_create_task(self._disconnect_callback())
 
@@ -107,12 +110,14 @@ class BaseDevice:
 
     async def disconnect(self) -> None:
         if self._client:
+            self._disconnecting = True
             try:
                 await self._client.disconnect()
             except Exception as e:
                 _LOGGER.warning("Error disconnecting %s: %s", self._mac, e)
             finally:
                 self._client = None
+                self._disconnecting = False
 
     async def _with_disconnect_on_error(self, coro):
         try:
